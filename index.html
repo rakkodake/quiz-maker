@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="クイズメーカー">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="manifest" href="manifest.json">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <title>早押しクイズ作成ツール</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-bg: #ffffff;
+      --color-bg-secondary: #f5f5f5;
+      --color-border: #e0e0e0;
+      --color-text: #1a1a1a;
+      --color-text-secondary: #666666;
+      --color-text-tertiary: #999999;
+      --color-accent: #1a1a1a;
+      --color-danger: #d32f2f;
+      --color-success: #2e7d32;
+      --color-info-bg: #e8f4fd;
+      --color-info-text: #1565c0;
+    }
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", sans-serif;
+      background: var(--color-bg);
+      color: var(--color-text);
+      font-size: 16px;
+      -webkit-text-size-adjust: 100%;
+    }
+    body { display: flex; flex-direction: column; min-height: 100dvh; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+
+    .app-header {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--color-border);
+      position: sticky; top: 0;
+      background: var(--color-bg); z-index: 10;
+    }
+    .app-title { font-size: 15px; font-weight: 600; }
+
+    .scroll-area {
+      flex: 1; overflow-y: auto;
+      padding: 16px;
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
+    }
+
+    .section { margin-bottom: 20px; }
+    label { font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 6px; font-weight: 500; }
+
+    input[type="text"], input[type="password"], textarea, select {
+      width: 100%; padding: 12px 14px;
+      font-size: 16px; font-family: inherit;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      background: var(--color-bg); color: var(--color-text);
+      -webkit-appearance: none; appearance: none; outline: none;
+    }
+    input:focus, textarea:focus, select:focus { border-color: var(--color-accent); }
+    textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px;
+    }
+
+    .api-section {
+      background: var(--color-bg-secondary);
+      border: 1px solid var(--color-border);
+      border-radius: 12px; padding: 14px; margin-bottom: 20px;
+    }
+    .api-section label { margin-top: 10px; }
+    .api-section label:first-child { margin-top: 0; }
+    .api-note { font-size: 11px; color: var(--color-text-tertiary); margin-top: 6px; }
+
+    .row { display: flex; gap: 10px; }
+    .row > * { flex: 1; min-width: 0; }
+
+    button { font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .generate-btn {
+      width: 100%; padding: 15px; font-size: 16px; font-weight: 600;
+      background: var(--color-accent); color: #fff;
+      border: none; border-radius: 12px; transition: opacity 0.15s;
+    }
+    .generate-btn:active { opacity: 0.8; }
+    .generate-btn:disabled { opacity: 0.4; }
+
+    .error-msg { font-size: 13px; color: var(--color-danger); padding: 8px 0; }
+    .success-msg { font-size: 13px; color: var(--color-success); padding: 8px 0; }
+    .loading { font-size: 13px; color: var(--color-text-secondary); padding: 12px 0; text-align: center; }
+
+    .candidates { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+    .candidates-label { font-size: 12px; color: var(--color-text-secondary); font-weight: 500; margin-bottom: 4px; }
+    .candidate-card { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 16px; padding: 14px; }
+    .candidate-q { font-size: 14px; line-height: 1.7; margin-bottom: 12px; white-space: pre-wrap; }
+    .candidate-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .adopt-btn {
+      font-size: 13px; padding: 9px 16px;
+      background: var(--color-bg-secondary); border: 1px solid var(--color-border);
+      border-radius: 8px; color: var(--color-text); min-height: 44px;
+    }
+    .adopt-btn:active { opacity: 0.7; }
+    .adopt-btn.danger { color: var(--color-danger); }
+
+    .feedback-area { margin-top: 12px; display: none; flex-direction: column; gap: 10px; }
+    .feedback-area.open { display: flex; }
+    .feedback-types { display: flex; gap: 6px; flex-wrap: wrap; }
+    .ft-btn {
+      font-size: 12px; padding: 8px 12px;
+      background: var(--color-bg-secondary); border: 1px solid var(--color-border);
+      border-radius: 8px; color: var(--color-text-secondary); min-height: 36px;
+    }
+    .ft-btn.selected { background: var(--color-info-bg); border-color: var(--color-info-text); color: var(--color-info-text); }
+    .feedback-input-wrap { display: flex; gap: 8px; }
+    .feedback-input-wrap input { flex: 1; }
+    .regen-btn {
+      font-size: 13px; padding: 9px 16px;
+      background: var(--color-bg); border: 1px solid var(--color-border);
+      border-radius: 8px; color: var(--color-text); white-space: nowrap; min-height: 44px;
+    }
+
+    .divider { border: none; border-top: 1px solid var(--color-border); margin: 20px 0; }
+    .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .list-title { font-size: 15px; font-weight: 600; }
+    .count-badge {
+      font-size: 12px; padding: 3px 10px;
+      background: var(--color-bg-secondary); border: 1px solid var(--color-border);
+      border-radius: 100px; color: var(--color-text-secondary);
+    }
+    .export-btn {
+      font-size: 13px; padding: 8px 14px;
+      background: var(--color-bg); border: 1px solid var(--color-border);
+      border-radius: 8px; color: var(--color-text); min-height: 44px;
+    }
+
+    .quiz-item { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+    .quiz-item-meta { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
+    .tag { font-size: 11px; padding: 3px 8px; border-radius: 100px; }
+    .tag-genre { background: var(--color-info-bg); color: var(--color-info-text); }
+    .tag-diff { background: var(--color-bg-secondary); color: var(--color-text-secondary); }
+    .quiz-item-q { font-size: 13px; line-height: 1.6; margin-bottom: 6px; }
+    .quiz-item-a { font-size: 13px; color: var(--color-text-secondary); }
+    .quiz-item-a strong { color: var(--color-text); font-weight: 600; }
+    .delete-btn {
+      float: right; font-size: 12px; padding: 5px 10px;
+      background: none; border: 1px solid var(--color-border);
+      border-radius: 8px; color: var(--color-text-tertiary); min-height: 32px;
+    }
+    .delete-btn:active { color: var(--color-danger); border-color: var(--color-danger); }
+    .empty-state { font-size: 13px; color: var(--color-text-tertiary); text-align: center; padding: 2rem 0; }
+
+    /* ログイン画面 */
+    .login-screen {
+      position: fixed; inset: 0;
+      background: var(--color-bg);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 20px; z-index: 100; padding: 32px;
+    }
+    .login-title { font-size: 20px; font-weight: 700; }
+    .login-desc { font-size: 13px; color: var(--color-text-secondary); text-align: center; }
+    .login-screen.hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1 class="sr-only">早押しクイズ問題作成ツール</h1>
+
+  <!-- ログイン画面 -->
+  <div class="login-screen" id="loginScreen">
+    <div class="login-title">🎯 クイズ作成ツール</div>
+    <div class="login-desc">利用するにはGoogleアカウントでログインしてください</div>
+    <div id="googleSignInBtn"></div>
+    <div id="loginError" class="error-msg" style="display:none;text-align:center;"></div>
+  </div>
+  <header class="app-header">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div class="app-title">🎯 早押しクイズ作成ツール</div>
+      <a href="https://www.notion.so/35fcd6ccdc7d8014a457ca4af380b84f" target="_blank" rel="noopener" style="font-size:12px; color:var(--color-text-secondary); text-decoration:none; padding:6px 10px; border:1px solid var(--color-border); border-radius:8px; white-space:nowrap;">Notionで確認 →</a>
+    </div>
+  </header>
+
+  <div class="scroll-area">
+    <div class="api-section">
+      <label>Gemini APIキー</label>
+      <input type="password" id="apiKey" placeholder="AIza..." autocomplete="off">
+      <label>モデル</label>
+      <select id="modelSelect">
+        <option value="gemini-2.5-flash">gemini-2.5-flash（推奨）</option>
+        <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+      </select>
+      <p class="api-note">🔒 キーはブラウザに自動保存されます</p>
+    </div>
+
+    <div class="section">
+      <label>答え</label>
+      <textarea id="answer" placeholder="例：織田信長"></textarea>
+    </div>
+
+    <div class="section row">
+      <div>
+        <label>ジャンル</label>
+        <select id="genre">
+          <option>歴史</option><option>科学</option><option>地理</option>
+          <option>芸能・エンタメ</option><option>スポーツ</option>
+          <option>文学</option><option>音楽</option><option>その他</option>
+        </select>
+      </div>
+      <div>
+        <label>難易度</label>
+        <select id="difficulty">
+          <option value="1">★1（易）</option>
+          <option value="2">★2</option>
+          <option value="3" selected>★3（普通）</option>
+          <option value="4">★4</option>
+          <option value="5">★5（難）</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section">
+      <label>補足情報（任意）</label>
+      <textarea id="supplement" placeholder="追加で使いたい情報や制約など" style="min-height: 56px;"></textarea>
+    </div>
+
+    <button class="generate-btn" id="generateBtn" onclick="generateQuestions()">問題文を生成する</button>
+    <div id="errorMsg" class="error-msg" style="display:none;"></div>
+    <div id="notionSuccessMsg" class="success-msg" style="display:none;">✅ Notionに保存しました！</div>
+    <div id="loadingMsg" class="loading" style="display:none;">AIが問題文を考えています…</div>
+    <div id="candidatesArea" style="margin-top: 4px;"></div>
+
+    <hr class="divider">
+
+    <div class="list-header">
+      <span class="list-title">採用済み問題</span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="count-badge" id="countBadge">0 問</span>
+        <button class="export-btn" onclick="exportCSV()">CSV出力</button>
+      </div>
+    </div>
+    <div id="quizList"><p class="empty-state">まだ問題がありません</p></div>
+  </div>
+
+<script>
+const DIFF_LABELS = {1:'★1',2:'★2',3:'★3',4:'★4',5:'★5'};
+const CLIENT_ID = "211663007364-jlpgo7s2q9h68lin5kpjdudgouhs8j8b.apps.googleusercontent.com";
+let accessToken = null;
+let quizzes = [];
+let candidates = [];
+
+// Google認証初期化
+window.addEventListener("load", () => {
+  google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: "email profile",
+    callback: (response) => {
+      if (response.error) {
+        document.getElementById("loginError").textContent = "ログインに失敗しました";
+        document.getElementById("loginError").style.display = "block";
+        return;
+      }
+      accessToken = response.access_token;
+      // GAS側でメールアドレス検証するのでここではそのままログイン
+      document.getElementById("loginScreen").classList.add("hidden");
+      loadSettings();
+    }
+  }).requestAccessToken();
+});
+
+// ログインボタン描画
+window.addEventListener("DOMContentLoaded", () => {
+  google.accounts.id.initialize({
+    client_id: CLIENT_ID,
+    callback: () => {}
+  });
+  google.accounts.id.renderButton(
+    document.getElementById("googleSignInBtn"),
+    { theme: "outline", size: "large", text: "signin_with", locale: "ja" }
+  );
+  document.getElementById("googleSignInBtn").addEventListener("click", () => {
+    // ボタンクリックでOAuthフロー開始
+  });
+});
+
+const SYSTEM_PROMPT = `あなたは早押しクイズの問題文を作成する専門家です。以下のルールを必ず守ってください。
+
+【早押しクイズ問題文のルール】
+1. 問題文は前半と後半の2パートで構成すること
+2. 前半：マニアックでニッチな情報（知っている人が少ない）
+3. 後半：一般的に広く知られている情報
+4. 最後まで聞いたとき、答えが必ず1つに絞れること
+5. 途中で答えがわかった人が押せる構造であること
+6. 問題文の末尾は「〜は誰でしょう？」「〜は何でしょう？」などで締めること
+7. 問題文は簡潔に。100文字以内を目安にすること。
+8. 問題文はできるだけ1文で構成すること。読点（、）でつなげて1文にまとめること。
+
+【出力形式】
+{"questions":[{"text":"問題文1"},{"text":"問題文2"},{"text":"問題文3"}]}
+上記のJSON形式のみで出力してください。\`\`\`などのコードブロックは使わないでください。`;
+
+function extractJSON(text) {
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("JSONが見つかりませんでした");
+  return JSON.parse(match[0]);
+}
+
+async function callGemini(contents) {
+  const apiKey = document.getElementById("apiKey").value.trim();
+  if (!apiKey) throw new Error("APIキーを入力してください");
+  const model = document.getElementById("modelSelect").value;
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents,
+        generationConfig: { maxOutputTokens: 8192, temperature: 1.0 }
+      })
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || "APIエラー: " + res.status);
+  }
+  const data = await res.json();
+  const parts = data.candidates?.[0]?.content?.parts || [];
+  const text = parts.filter(p => p.text).map(p => p.text).join("");
+  return extractJSON(text);
+}
+
+async function generateQuestions() {
+  const answer = document.getElementById("answer").value.trim();
+  if (!answer) { showError("答えを入力してください"); return; }
+  const genre = document.getElementById("genre").value;
+  const diff = document.getElementById("difficulty").value;
+  const supplement = document.getElementById("supplement").value.trim();
+  setLoading(true); clearError();
+  const userMsg = `以下の条件で早押しクイズの問題文を3問作成してください。\n答え：${answer}\nジャンル：${genre}\n難易度：★${diff}（${diff<=2?"メジャーな情報を中心に":diff>=4?"ニッチな情報を中心に":"バランスよく"}）\n${supplement?"補足情報："+supplement:""}`;
+  try {
+    const result = await callGemini([{ role: "user", parts: [{ text: userMsg }] }]);
+    candidates = result.questions.map((q, i) => ({
+      id: Date.now() + i, text: q.text, answer, genre, difficulty: parseInt(diff)
+    }));
+    renderCandidates();
+  } catch(e) {
+    showError("生成に失敗しました：" + e.message);
+  }
+  setLoading(false);
+}
+
+async function regenerate(idx, feedbackType, feedbackText) {
+  const c = candidates[idx];
+  const card = document.getElementById("card_" + c.id);
+  const btn = card ? card.querySelector(".regen-btn") : null;
+  if (btn) { btn.disabled = true; btn.textContent = "再生成中…"; }
+  const typeLabel = {
+    "構成NG": "問題文の構成が早押しクイズになっていない。前半マニアック・後半メジャーの構造に修正してください",
+    "情報修正": "問題文の前半または後半の情報を修正・改善してください",
+    "難易度調整": feedbackText.includes("易")||feedbackText.includes("メジャー")?"もっとメジャーな情報にしてください":"もっとニッチな情報にしてください",
+  }[feedbackType] || feedbackType;
+  const contents = [
+    { role: "user", parts: [{ text: `答え「${c.answer}」（ジャンル：${c.genre}）の早押しクイズ問題文を作成してください。` }] },
+    { role: "model", parts: [{ text: JSON.stringify({ questions: [{ text: c.text }] }) }] },
+    { role: "user", parts: [{ text: `以下の指摘を踏まえて修正した新しい問題文を1問だけ作成してください。\n指摘種別：${feedbackType}\n${typeLabel}\n${feedbackText?"補足："+feedbackText:""}` }] }
+  ];
+  try {
+    const result = await callGemini(contents);
+    candidates[idx].text = result.questions[0].text;
+    renderCandidates();
+  } catch(e) {
+    showError("再生成に失敗しました：" + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = "再生成"; }
+  }
+}
+
+async function adopt(idx) {
+  const c = candidates[idx];
+  const quiz = { id: Date.now(), question: c.text, answer: c.answer, genre: c.genre, difficulty: c.difficulty };
+  quizzes.push(quiz);
+  candidates.splice(idx, 1);
+  renderCandidates(); renderQuizList();
+  await saveToNotion(quiz);
+}
+
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxcX0jmOnubTT2DZKn1HgDCmYx3NlJ6J6aymjBRV5XChf-E0afS94gsKSNKAA47UP-C/exec";
+
+async function saveToNotion(quiz) {
+  try {
+    await fetch(GAS_URL + "?token=" + encodeURIComponent(accessToken), {
+      method: "POST", mode: "no-cors",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({
+        question: quiz.question, answer: quiz.answer,
+        genre: quiz.genre, difficulty: DIFF_LABELS[quiz.difficulty]
+      })
+    });
+    showNotionSuccess();
+  } catch(e) {
+    showError("Notion保存に失敗しました：" + e.message);
+  }
+}
+
+function showNotionSuccess() {
+  const el = document.getElementById("notionSuccessMsg");
+  el.style.display = "block";
+  setTimeout(() => { el.style.display = "none"; }, 3000);
+}
+
+function botsu(idx) { candidates.splice(idx, 1); renderCandidates(); }
+function toggleFeedback(id) { document.getElementById("fb_" + id).classList.toggle("open"); }
+function selectFeedbackType(id, type) {
+  document.querySelectorAll("#ftg_" + id + " .ft-btn").forEach(b => b.classList.remove("selected"));
+  document.getElementById("ft_" + id + "_" + type).classList.add("selected");
+}
+
+function renderCandidates() {
+  const area = document.getElementById("candidatesArea");
+  if (!candidates.length) { area.innerHTML = ""; return; }
+  area.innerHTML = '<p class="candidates-label">生成された問題文候補</p><div class="candidates">' +
+    candidates.map((c, i) => `
+      <div class="candidate-card" id="card_${c.id}">
+        <div class="candidate-q">${escHtml(c.text)}</div>
+        <div class="candidate-actions">
+          <button class="adopt-btn" onclick="adopt(${i})">✓ 採用</button>
+          <button class="adopt-btn" onclick="toggleFeedback(${c.id})">✎ 修正</button>
+          <button class="adopt-btn danger" onclick="botsu(${i})">✕ ボツ</button>
+        </div>
+        <div class="feedback-area" id="fb_${c.id}">
+          <div class="feedback-types" id="ftg_${c.id}">
+            ${["構成NG","情報修正","難易度調整"].map(t =>
+              `<button class="ft-btn" id="ft_${c.id}_${t}" onclick="selectFeedbackType(${c.id},'${t}')">${t}</button>`
+            ).join("")}
+          </div>
+          <div class="feedback-input-wrap">
+            <input type="text" id="fi_${c.id}" placeholder="補足（任意）">
+            <button class="regen-btn" onclick="doRegen(${i},${c.id})">再生成</button>
+          </div>
+        </div>
+      </div>`).join("") + "</div>";
+}
+
+function doRegen(idx, id) {
+  const selected = document.querySelector("#ftg_" + id + " .ft-btn.selected");
+  const type = selected ? selected.textContent : "情報修正";
+  const text = document.getElementById("fi_" + id).value.trim();
+  regenerate(idx, type, text);
+}
+
+function renderQuizList() {
+  const list = document.getElementById("quizList");
+  document.getElementById("countBadge").textContent = quizzes.length + " 問";
+  if (!quizzes.length) { list.innerHTML = '<p class="empty-state">まだ問題がありません</p>'; return; }
+  list.innerHTML = [...quizzes].reverse().map(q => `
+    <div class="quiz-item">
+      <button class="delete-btn" onclick="deleteQuiz(${q.id})">削除</button>
+      <div class="quiz-item-meta">
+        <span class="tag tag-genre">${escHtml(q.genre)}</span>
+        <span class="tag tag-diff">${DIFF_LABELS[q.difficulty]}</span>
+      </div>
+      <div class="quiz-item-q">${escHtml(q.question)}</div>
+      <div class="quiz-item-a">答え：<strong>${escHtml(q.answer)}</strong></div>
+    </div>`).join("");
+}
+
+function deleteQuiz(id) { quizzes = quizzes.filter(q => q.id !== id); renderQuizList(); }
+
+function exportCSV() {
+  if (!quizzes.length) { showError("問題がまだありません"); return; }
+  const rows = [["問題文","答え","ジャンル","難易度"]];
+  quizzes.forEach(q => rows.push([q.question, q.answer, q.genre, DIFF_LABELS[q.difficulty]]));
+  const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = "quiz_" + new Date().toISOString().slice(0,10) + ".csv"; a.click();
+}
+
+function setLoading(v) {
+  document.getElementById("loadingMsg").style.display = v ? "block" : "none";
+  document.getElementById("generateBtn").disabled = v;
+}
+function showError(msg) { const el = document.getElementById("errorMsg"); el.textContent = msg; el.style.display = "block"; }
+function clearError() { document.getElementById("errorMsg").style.display = "none"; }
+function escHtml(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+const STORAGE_KEYS = { geminiKey: "quiz_gemini_api_key", model: "quiz_model" };
+function saveSettings() {
+  localStorage.setItem(STORAGE_KEYS.geminiKey, document.getElementById("apiKey").value);
+  localStorage.setItem(STORAGE_KEYS.model, document.getElementById("modelSelect").value);
+}
+function loadSettings() {
+  const k = localStorage.getItem(STORAGE_KEYS.geminiKey);
+  const m = localStorage.getItem(STORAGE_KEYS.model);
+  if (k) document.getElementById("apiKey").value = k;
+  if (m) document.getElementById("modelSelect").value = m;
+}
+window.addEventListener("DOMContentLoaded", () => {});
+["apiKey", "modelSelect"].forEach(id => {
+  document.getElementById(id)?.addEventListener("change", saveSettings);
+});
+</script>
+</body>
+</html>
