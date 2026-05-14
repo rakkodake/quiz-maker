@@ -253,6 +253,15 @@ let candidates = [];
 
 // Google認証初期化
 window.addEventListener("load", () => {
+  // セッションストレージにトークンがあればそのまま使う
+  const savedToken = sessionStorage.getItem("quiz_access_token");
+  if (savedToken) {
+    accessToken = savedToken;
+    document.getElementById("loginScreen").classList.add("hidden");
+    loadSettings();
+    return;
+  }
+
   google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: "email profile",
@@ -263,7 +272,7 @@ window.addEventListener("load", () => {
         return;
       }
       accessToken = response.access_token;
-      // GAS側でメールアドレス検証するのでここではそのままログイン
+      sessionStorage.setItem("quiz_access_token", accessToken);
       document.getElementById("loginScreen").classList.add("hidden");
       loadSettings();
     }
