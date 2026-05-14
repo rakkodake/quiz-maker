@@ -254,7 +254,7 @@ let candidates = [];
 // Google認証初期化
 window.addEventListener("load", () => {
   // セッションストレージにトークンがあればそのまま使う
-  const savedToken = sessionStorage.getItem("quiz_access_token");
+  const savedToken = localStorage.getItem("quiz_access_token");
   if (savedToken) {
     accessToken = savedToken;
     document.getElementById("loginScreen").classList.add("hidden");
@@ -272,7 +272,7 @@ window.addEventListener("load", () => {
         return;
       }
       accessToken = response.access_token;
-      sessionStorage.setItem("quiz_access_token", accessToken);
+      localStorage.setItem("quiz_access_token", accessToken);
       document.getElementById("loginScreen").classList.add("hidden");
       loadSettings();
     }
@@ -408,10 +408,25 @@ async function saveToNotion(quiz) {
         genre: quiz.genre, difficulty: DIFF_LABELS[quiz.difficulty]
       })
     });
+    // トークン有効期限確認
+    const check = await fetch("https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=" + accessToken);
+    if (!check.ok) {
+      requestReAuth();
+      return;
+    }
     showNotionSuccess();
   } catch(e) {
     showError("Notion保存に失敗しました：" + e.message);
   }
+}
+
+function requestReAuth() {
+  localStorage.removeItem("quiz_access_token");
+  accessToken = null;
+  showError("ログインの有効期限が切れました。再ログインしてください");
+  setTimeout(() => {
+    document.getElementById("loginScreen").classList.remove("hidden");
+  }, 2000);
 }
 
 function showNotionSuccess() {
