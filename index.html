@@ -448,10 +448,12 @@ function renderCandidates() {
   area.innerHTML = '<p class="candidates-label">生成された問題文候補</p><div class="candidates">' +
     candidates.map((c, i) => `
       <div class="candidate-card" id="card_${c.id}">
-        <div class="candidate-q">${escHtml(c.text)}</div>
+        <div class="candidate-q" id="qtext_${c.id}">${escHtml(c.text)}</div>
+        <textarea class="candidate-edit" id="qedit_${c.id}" style="display:none; width:100%; font-size:14px; line-height:1.7; border:1px solid var(--color-border); border-radius:8px; padding:8px 10px; background:var(--color-bg-secondary); color:var(--color-text); resize:vertical; min-height:80px; font-family:inherit; margin-bottom:12px;">${escHtml(c.text)}</textarea>
         <div class="candidate-actions">
           <button class="adopt-btn" onclick="adopt(${i})">✓ 採用</button>
-          <button class="adopt-btn" onclick="toggleFeedback(${c.id})">✎ 修正</button>
+          <button class="adopt-btn" onclick="toggleEdit(${c.id}, ${i})" id="editbtn_${c.id}">✎ 手修正</button>
+          <button class="adopt-btn" onclick="toggleFeedback(${c.id})">↺ AI修正</button>
           <button class="adopt-btn danger" onclick="botsu(${i})">✕ ボツ</button>
         </div>
         <div class="feedback-area" id="fb_${c.id}">
@@ -466,6 +468,28 @@ function renderCandidates() {
           </div>
         </div>
       </div>`).join("") + "</div>";
+}
+
+function toggleEdit(id, idx) {
+  const qtext = document.getElementById("qtext_" + id);
+  const qedit = document.getElementById("qedit_" + id);
+  const btn = document.getElementById("editbtn_" + id);
+  const isEditing = qedit.style.display !== "none";
+  if (isEditing) {
+    // 編集終了：テキストを反映
+    candidates[idx].text = qedit.value;
+    qtext.textContent = qedit.value;
+    qtext.style.display = "block";
+    qedit.style.display = "none";
+    btn.textContent = "✎ 手修正";
+  } else {
+    // 編集開始
+    qedit.value = candidates[idx].text;
+    qtext.style.display = "none";
+    qedit.style.display = "block";
+    btn.textContent = "✎ 完了";
+    qedit.focus();
+  }
 }
 
 function doRegen(idx, id) {
